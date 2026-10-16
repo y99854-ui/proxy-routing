@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>分流检查</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">分流检查</div>
+    <nav class="tabs">
+      <button class="tab active" data-view="single">单个检查</button>
+      <button class="tab" data-view="batch">常用网站</button>
+    </nav>
+    <button id="statusPill" class="pill" title="点击展开连接设置">
+      <span class="dot"></span><span id="statusText">未连接</span>
+    </button>
+  </header>
+
+  <!-- 连接设置：默认折叠，连不上时自动展开 -->
+  <section id="settings" class="card settings hidden">
+    <div class="row">
+      <label>控制 API<input id="controller" placeholder="Karing 默认 127.0.0.1:3057" /></label>
+      <label>密钥 secret<input id="secret" type="password" placeholder="没有可留空" /></label>
+      <label class="narrow">代理端口<input id="mixedPort" type="number" placeholder="Karing 用 3067" /></label>
+    </div>
+    <div class="row actions">
+      <button id="detectBtn" class="ghost">自动读取配置（Karing / Clash Verge）</button>
+      <button id="connectBtn">连接</button>
+      <span id="settingsMsg" class="muted"></span>
+    </div>
+  </section>
+
+  <!-- ───────── 视图 1：单个检查 ───────── -->
+  <main id="view-single">
+    <form id="checkForm" class="search">
+      <input id="urlInput" list="siteList" autocomplete="off" spellcheck="false"
+             placeholder="输入网址或从下拉选择，例如 youtube.com" />
+      <datalist id="siteList"></datalist>
+      <button id="checkBtn" type="submit">检查</button>
+    </form>
+
+    <div id="error" class="error hidden"></div>
+    <div id="loading" class="loading hidden">正在经代理访问并读取分流信息…</div>
+
+    <section id="result" class="hidden">
+      <div class="card hero">
+        <div class="muted small">这个网址走的节点</div>
+        <div class="node-line">
+          <span id="nodeName" class="node"></span>
+          <span id="nodeType" class="badge"></span>
+        </div>
+        <div id="chain" class="chain"></div>
+      </div>
+
+      <div id="warnings"></div>
+
+      <div class="grid">
+        <div class="card stat">
+          <div class="label">节点延迟</div>
+          <div id="delay" class="value"></div>
+          <div class="hint">内核让该节点访问此网址的往返时间</div>
+        </div>
+        <div class="card stat">
+          <div class="label">本次请求</div>
+          <div id="requestMs" class="value"></div>
+          <div id="httpStatus" class="hint"></div>
+        </div>
+        <div class="card stat">
+          <div class="label">出口 IP</div>
+          <div id="exitIp" class="value mono"></div>
+          <div id="exitInfo" class="hint"></div>
+        </div>
+        <div class="card stat">
+          <div class="label">节点服务器</div>
+          <div id="remote" class="value mono small-value"></div>
+          <div class="hint">内核实际连接的远端地址</div>
+        </div>
+        <div class="card stat wide">
+          <div class="label">命中规则</div>
+          <div id="rule" class="value mono small-value"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">修改分流</div>
+        <p class="muted small">切换策略组里选中的节点会立即生效，并影响这个组下的<strong>所有</strong>网站。</p>
+        <div id="groups"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ───────── 视图 2：常用网站批量测试 ───────── -->
+  <main id="view-batch" class="hidden">
+    <div class="batch-bar">
+      <button id="batchRun">开始测试</button>
+      <span id="batchProgress" class="muted"></span>
+      <span class="spacer"></span>
+      <form id="addSiteForm" class="add-site">
+        <input id="addSiteInput" placeholder="添加网站，如 openai.com" />
+        <button class="ghost" type="submit">添加</button>
+      </form>
+    </div>
+    <p class="muted small">每个网站经代理访问一次，读取命中的规则和节点，并测节点延迟。点击某一行可进入单个检查并修改节点。</p>
+    <div class="card table-card">
+      <table class="sites">
+        <thead>
+          <tr><th>网站</th><th>节点</th><th>所在组</th><th>命中规则</th><th class="num">延迟</th><th></th></tr>
+        </thead>
+        <tbody id="batchBody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="sites.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
