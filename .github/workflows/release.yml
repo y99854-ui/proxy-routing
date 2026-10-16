@@ -32,9 +32,8 @@ jobs:
       TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
     steps:
+      # 推送标签时构建该标签的代码；手动运行时构建所选分支（默认 main）的最新代码
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
 
       - uses: actions/setup-node@v4
         with:
@@ -61,4 +60,4 @@ jobs:
           releaseDraft: false
           args: ${{ matrix.args }}
           # GitHub 附件名不支持中文，用英文名
-          releaseAssetNamePattern: proxy-routing_${{ env.TAG }}_[arch][setup][ext]
+          assetNamePattern: proxy-routing_${{ env.TAG }}_[arch][setup][ext]
