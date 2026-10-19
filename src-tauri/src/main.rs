@@ -3,6 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod clash;
+mod override_rules;
 
 fn main() {
     tauri::Builder::default()
@@ -12,6 +13,11 @@ fn main() {
             clash::check_url,
             clash::quick_check,
             clash::switch_node,
+            override_rules::override_status,
+            override_rules::override_prepare,
+            override_rules::list_targets,
+            override_rules::override_set,
+            override_rules::override_remove,
         ])
         .run(tauri::generate_context!())
         .expect("启动 Tauri 应用失败");

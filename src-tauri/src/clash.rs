@@ -234,7 +234,7 @@ pub async fn detect_config() -> Result<ClashConfig, String> {
 // ───────────────────────── 控制 API ─────────────────────────
 
 /// 访问控制 API 的客户端：显式禁用代理，否则请求可能绕回 Clash 自己。
-fn api_client() -> Result<reqwest::Client, String> {
+pub(crate) fn api_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .no_proxy()
         .timeout(Duration::from_secs(15))
@@ -258,11 +258,11 @@ fn proxied_client(cfg: &ClashConfig) -> Result<reqwest::Client, String> {
         .map_err(|e| e.to_string())
 }
 
-fn api_url(cfg: &ClashConfig, path: &str) -> String {
+pub(crate) fn api_url(cfg: &ClashConfig, path: &str) -> String {
     format!("http://{}{}", cfg.controller, path)
 }
 
-fn with_auth(req: reqwest::RequestBuilder, cfg: &ClashConfig) -> reqwest::RequestBuilder {
+pub(crate) fn with_auth(req: reqwest::RequestBuilder, cfg: &ClashConfig) -> reqwest::RequestBuilder {
     if cfg.secret.is_empty() {
         req
     } else {
@@ -270,7 +270,7 @@ fn with_auth(req: reqwest::RequestBuilder, cfg: &ClashConfig) -> reqwest::Reques
     }
 }
 
-async fn api_get(cfg: &ClashConfig, path: &str) -> Result<Value, String> {
+pub(crate) async fn api_get(cfg: &ClashConfig, path: &str) -> Result<Value, String> {
     let client = api_client()?;
     let resp = with_auth(client.get(api_url(cfg, path)), cfg)
         .send()
@@ -301,12 +301,12 @@ pub async fn test_controller(cfg: ClashConfig) -> Result<String, String> {
     })
 }
 
-fn str_of(v: &Value, key: &str) -> String {
+pub(crate) fn str_of(v: &Value, key: &str) -> String {
     v.get(key).and_then(|x| x.as_str()).unwrap_or("").to_string()
 }
 
 /// 当前活动连接里所有指向该主机的连接。
-async fn host_connections(cfg: &ClashConfig, host: &str) -> Result<Vec<Value>, String> {
+pub(crate) async fn host_connections(cfg: &ClashConfig, host: &str) -> Result<Vec<Value>, String> {
     let data = api_get(cfg, "/connections").await?;
     let conns = data
         .get("connections")
