@@ -36,3 +36,25 @@ const DEFAULT_SITES = [
   { cat: "国内", name: "网易云音乐", url: "music.163.com" },
   { cat: "国内", name: "小红书", url: "www.xiaohongshu.com" },
 ];
+
+// 网站域名组：一个网站通常同时用多个域名（主站、CDN、实时连接等）。
+// 单站指定时会按这里提示“同时指定相关域名”。匹配方式：输入的域名等于或属于组里任一域名。
+const SITE_FAMILIES = [
+  { name: "Discord", domains: ["discord.com", "discordapp.com", "discordapp.net", "discord.gg", "discord.media"] },
+  { name: "YouTube", domains: ["youtube.com", "youtu.be", "googlevideo.com", "ytimg.com", "ggpht.com", "youtube-nocookie.com", "youtubei.googleapis.com"] },
+  { name: "Google Scholar", domains: ["scholar.google.com", "scholar.googleusercontent.com"] },
+  { name: "Google", domains: ["google.com", "googleapis.com", "gstatic.com", "googleusercontent.com", "gvt1.com"] },
+  { name: "Netflix", domains: ["netflix.com", "netflix.net", "nflxvideo.net", "nflximg.net", "nflximg.com", "nflxext.com", "nflxso.net"] },
+  { name: "X (Twitter)", domains: ["x.com", "twitter.com", "twimg.com", "t.co"] },
+  { name: "Instagram", domains: ["instagram.com", "cdninstagram.com"] },
+  { name: "Facebook", domains: ["facebook.com", "fb.com", "fbcdn.net", "facebook.net"] },
+  { name: "Telegram", domains: ["telegram.org", "t.me", "telegram.me", "telesco.pe", "tdesktop.com"] },
+  { name: "ChatGPT", domains: ["chatgpt.com", "openai.com", "oaistatic.com", "oaiusercontent.com"] },
+  { name: "Claude", domains: ["claude.ai", "anthropic.com", "claudeusercontent.com"] },
+  { name: "GitHub", domains: ["github.com", "githubusercontent.com", "githubassets.com", "github.io"] },
+  { name: "Reddit", domains: ["reddit.com", "redd.it", "redditmedia.com", "redditstatic.com"] },
+  { name: "Spotify", domains: ["spotify.com", "scdn.co", "spotifycdn.com"] },
+  { name: "TikTok", domains: ["tiktok.com", "tiktokcdn.com", "tiktokv.com", "ttwstatic.com"] },
+  { name: "Wikipedia", domains: ["wikipedia.org", "wikimedia.org", "wikidata.org"] },
+  { name: "哔哩哔哩", domains: ["bilibili.com", "hdslb.com", "bilivideo.com", "biliapi.net"] },
+];

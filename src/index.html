@@ -12,6 +12,7 @@
     <nav class="tabs">
       <button class="tab active" data-view="single">单个检查</button>
       <button class="tab" data-view="batch">常用网站</button>
+      <button class="tab" data-view="override">单站指定</button>
     </nav>
     <button id="statusPill" class="pill" title="点击展开连接设置">
       <span class="dot"></span><span id="statusText">未连接</span>
@@ -84,6 +85,11 @@
       </div>
 
       <div class="card">
+        <div class="section-title">只改这个网站</div>
+        <div id="pinBox"></div>
+      </div>
+
+      <div class="card">
         <div class="section-title">修改分流</div>
         <p class="muted small">切换策略组里选中的节点会立即生效，并影响这个组下的<strong>所有</strong>网站。</p>
         <div id="groups"></div>
@@ -111,6 +117,63 @@
         <tbody id="batchBody"></tbody>
       </table>
     </div>
+  </main>
+
+  <!-- ───────── 视图 3：单站指定 ───────── -->
+  <main id="view-override" class="hidden">
+    <div id="ovStatus" class="card"></div>
+
+    <div id="ovSetup" class="card hidden">
+      <div class="section-title">安装（只需一次，与选择哪个网站、哪个节点无关）</div>
+      <p class="explain">这一步只是在 Clash Verge Rev 里准备 8 个空的“槽位”，供以后存放单独指定的网站。
+        <strong>安装完成后，所有网站的分流和原来完全一样</strong>；真正给网站选节点，是安装之后在检查结果或下方列表里做的事，
+        之后也不需要再编辑 Clash Verge Rev。</p>
+      <ol class="steps">
+        <li>
+          <div>创建 8 个空的规则文件。</div>
+          <div class="muted small">文件里没有任何网站，不会改变现有分流。必须先做这一步，否则下一步保存后内核会因找不到文件而报错。</div>
+          <button id="ovPrepare" class="ghost">准备文件</button>
+          <span id="ovPrepareMsg" class="muted small"></span>
+        </li>
+        <li>
+          <div>复制扩展脚本。</div>
+          <div class="muted small">脚本里没有网站名或节点名，只负责建立 8 个空槽位，并让内核先查看这些槽位，不会改变现有分流。</div>
+          <button id="ovCopy" class="ghost">复制脚本</button>
+          <span id="ovCopyMsg" class="muted small"></span>
+          <details class="script-box"><summary class="muted small">查看脚本内容</summary><pre id="ovScript"></pre></details>
+        </li>
+        <li>
+          <div>打开 Clash Verge Rev →「订阅」页 → 找到「全局扩展脚本」（Script），右键或点菜单选「编辑文件」，
+            把里面的内容全部替换为刚复制的脚本，保存。</div>
+          <div class="muted small">这是唯一一次需要编辑 Clash Verge Rev。如果你原来的全局扩展脚本里写过自己的内容，需要手动合并，不要直接覆盖。</div>
+        </li>
+        <li>
+          <div>回到这里检查是否安装成功。</div>
+          <button id="ovCheck">检查是否生效</button>
+        </li>
+      </ol>
+      <p class="muted small">安装成功后，这里会换成“添加单独指定的网站”的界面。</p>
+    </div>
+
+    <div id="ovMain" class="hidden">
+      <div class="card">
+        <div class="section-title">添加</div>
+        <form id="ovForm" class="ov-form">
+          <input id="ovDomain" list="siteList" placeholder="网址或域名，如 scholar.google.com" autocomplete="off" spellcheck="false" />
+          <select id="ovTarget"></select>
+          <button type="submit">指定</button>
+        </form>
+        <div id="ovFam"></div>
+        <p class="muted small">指定后，这个域名及其所有子域名都会走所选的节点或策略组，并立即生效。最多同时使用 8 个不同的目标，网站数量不限。</p>
+      </div>
+      <div class="card table-card">
+        <table class="sites">
+          <thead><tr><th>网站</th><th>走向</th><th></th></tr></thead>
+          <tbody id="ovList"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="ovError" class="error hidden"></div>
   </main>
 
   <script src="sites.js"></script>

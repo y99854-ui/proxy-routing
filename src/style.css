@@ -142,3 +142,21 @@ table.sites .num { text-align: right; white-space: nowrap; }
 .c-rule { max-width: 220px; word-break: break-all; }
 
 .warn-tag { font-size: 11px; color: var(--mid); cursor: help; }
+
+/* ───────── 单站指定 ───────── */
+.steps { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 14px; }
+.steps li > div { margin-bottom: 6px; }
+.script-box { margin-top: 6px; }
+.script-box pre { max-height: 220px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-size: 11px; }
+.ov-form, .pin-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ov-form input { flex: 2; min-width: 200px; }
+.ov-form select, .pin-row select { flex: 1; min-width: 180px; width: auto; }
+.status-line { display: flex; align-items: center; gap: 8px; }
+.status-line .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status-line.ok .dot { background: var(--good); }
+.status-line.pending .dot { background: var(--mid); }
+.chip.pin { background: var(--accent); color: #fff; }
+
+.fam-box { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 8px; display: grid; gap: 4px; }
+.fam-item { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.fam-item input { width: auto; }

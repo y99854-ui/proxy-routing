@@ -20,6 +20,11 @@ function esc(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// 单站指定用的隐藏策略组（PR-指定1…8），显示时换成易懂的名字
+const PIN_PREFIX = "PR-指定";
+const isPin = (name) => String(name || "").startsWith(PIN_PREFIX);
+const label = (name) => (isPin(name) ? "单站指定" : name);
+
 function ms(v) {
   if (v == null) return "—";
   const cls = v < 300 ? "good" : v < 800 ? "mid" : "slow";
@@ -28,10 +33,11 @@ function ms(v) {
 
 // ───────── 视图切换 ─────────
 
+const VIEWS = ["single", "batch", "override"];
 function showView(name) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
-  $("view-single").classList.toggle("hidden", name !== "single");
-  $("view-batch").classList.toggle("hidden", name !== "batch");
+  VIEWS.forEach((v) => $("view-" + v).classList.toggle("hidden", v !== name));
+  if (name === "override") loadOverride();
 }
 document.querySelectorAll(".tab").forEach((t) => (t.onclick = () => showView(t.dataset.view)));
 
@@ -123,7 +129,7 @@ function render(r) {
   const path = [...r.chains].reverse();
   $("chain").innerHTML =
     `<span class="chip host">${esc(r.host)}</span>` +
-    path.map((p) => `<span class="arrow">→</span><span class="chip">${esc(p)}</span>`).join("");
+    path.map((p) => `<span class="arrow">→</span><span class="chip ${isPin(p) ? "pin" : ""}">${esc(label(p))}</span>`).join("");
 
   $("warnings").innerHTML = r.warnings.map((w) => `<div class="warn">${esc(w)}</div>`).join("");
 
@@ -145,13 +151,19 @@ function render(r) {
   $("rule").textContent = r.rulePayload ? `${r.rule}  ${r.rulePayload}` : (r.rule || "—");
 
   renderGroups(r);
+  renderPin(r);
   $("result").classList.remove("hidden");
 }
 
 const AUTO_KINDS = ["URLTest", "Fallback", "LoadBalance"];
 
 function renderGroups(r) {
-  const groups = r.groups;
+  const pinned = r.groups.some((g) => isPin(g.name));
+  const groups = r.groups.filter((g) => !isPin(g.name));
+  if (pinned && !groups.length) {
+    $("groups").innerHTML = `<p class="explain">这个网站已经单独指定到「${esc(r.node)}」，可以在上方「只改这个网站」里修改或取消。</p>`;
+    return;
+  }
   if (!groups.length) {
     $("groups").innerHTML = `
       <p class="explain">规则把这个网址直接交给了「${esc(r.node)}」，中间没有经过策略组，所以这里没有可切换的节点。</p>
@@ -261,7 +273,9 @@ function fillRow(tr, r, err) {
   cell(".c-node").textContent = r.node || "—";
   cell(".c-node").classList.remove("muted");
   const g = r.groups[0]; // 节点直接所在的组
-  cell(".c-group").innerHTML = g ? `${esc(g.name)} <span class="badge">${esc(g.kind)}</span>` : `<span class="muted">（直接命中）</span>`;
+  cell(".c-group").innerHTML = !g ? `<span class="muted">（直接命中）</span>`
+    : isPin(g.name) ? `<span class="chip pin">单站指定</span>`
+    : `${esc(g.name)} <span class="badge">${esc(g.kind)}</span>`;
   cell(".c-rule").textContent = r.rulePayload ? `${r.rule} ${r.rulePayload}` : r.rule;
   cell(".c-delay").innerHTML = r.nodeDelayMs != null ? ms(r.nodeDelayMs) : `<span class="slow">超时</span>`;
   // 分流信息拿到了，但网站本身没正常响应（被拒、超时等）：标个提示，鼠标悬停看原因
@@ -316,6 +330,185 @@ $("addSiteForm").onsubmit = (e) => {
   $("addSiteInput").value = "";
   renderBatchRows();
   fillDatalist();
+};
+
+// ───────── 单站指定 ─────────
+
+let ov = null;       // override_status 的结果
+let targets = null;  // { groups, nodes }
+
+async function refreshOverride() {
+  if (!cfg) { ov = null; return; }
+  try {
+    ov = await invoke("override_status", { cfg });
+    targets = ov.installed ? await invoke("list_targets", { cfg }) : null;
+  } catch (e) {
+    ov = null;
+    $("ovError").textContent = String(e);
+    $("ovError").classList.remove("hidden");
+  }
+}
+
+function targetOptions(selected) {
+  if (!targets) return "";
+  const opt = (n) => `<option value="${esc(n)}" ${n === selected ? "selected" : ""}>${esc(n)}</option>`;
+  return `<optgroup label="策略组">${targets.groups.map(opt).join("")}</optgroup>
+          <optgroup label="节点">${targets.nodes.map(opt).join("")}</optgroup>`;
+}
+
+function domainOf(url) {
+  try { return new URL(url.includes("://") ? url : "https://" + url).hostname.toLowerCase(); }
+  catch { return ""; }
+}
+
+// 找出域名所属的网站域名组（见 sites.js 的 SITE_FAMILIES）。
+// 多个组都匹配时取匹配得最具体的那个（如 scholar.google.com 归 Google Scholar 而不是 Google）。
+function findFamily(domain) {
+  let best = null, bestLen = 0;
+  for (const f of SITE_FAMILIES) {
+    for (const m of f.domains) {
+      if ((domain === m || domain.endsWith("." + m)) && m.length > bestLen) {
+        best = f; bestLen = m.length;
+      }
+    }
+  }
+  if (!best) return null;
+  return { name: best.name, related: best.domains.filter((m) => m !== domain) };
+}
+
+// 相关域名的勾选框。mode = "set"：默认全选，已指定到同一目标的标注出来；
+// mode = "remove"：只列出当前已被指定的相关域名。
+function familyChecks(fam, idPrefix, mode, target) {
+  if (!fam) return "";
+  const assigned = new Map((ov?.assignments || []).map((a) => [a.domain, a.target]));
+  const items = fam.related
+    .filter((d) => mode === "set" || assigned.has(d))
+    .map((d) => {
+      const note = assigned.has(d) ? `<span class="muted small">（已指定到 ${esc(assigned.get(d))}）</span>` : "";
+      return `<label class="fam-item"><input type="checkbox" class="${idPrefix}-fam" value="${esc(d)}" checked /> ${esc(d)} ${note}</label>`;
+    });
+  if (!items.length) return "";
+  const title = mode === "set" ? `同时指定 ${esc(fam.name)} 的相关域名` : `同时取消 ${esc(fam.name)} 的相关域名`;
+  return `<div class="fam-box"><div class="small">${title}：</div>${items.join("")}</div>`;
+}
+
+const checkedFam = (cls) => [...document.querySelectorAll("." + cls + ":checked")].map((c) => c.value);
+
+// 检查结果页里的「只改这个网站」
+async function renderPin(r) {
+  const box = $("pinBox");
+  box.innerHTML = `<span class="muted small">读取中…</span>`;
+  await refreshOverride();
+  if (!ov || !ov.supported) {
+    box.innerHTML = `<p class="muted small">${esc(ov ? ov.message : "未连接")}</p>`;
+    return;
+  }
+  if (!ov.installed) {
+    box.innerHTML = `<p class="muted small">想让这个网站单独走某个节点，需要先完成一次安装（只需一次，不会改变现有分流）。</p>
+      <button class="ghost" id="goSetup">去安装</button>`;
+    $("goSetup").onclick = () => showView("override");
+    return;
+  }
+  const domain = r.host.toLowerCase();
+  const cur = ov.assignments.find((a) => a.domain === domain);
+  const fam = findFamily(domain);
+  box.innerHTML = `
+    <div class="pin-row">
+      <span>${esc(domain)} 及子域名 →</span>
+      <select id="pinTarget">${targetOptions(cur ? cur.target : r.node)}</select>
+      <button id="pinSet">${cur ? "修改" : "指定"}</button>
+      ${cur ? `<button id="pinDel" class="ghost">取消指定</button>` : ""}
+    </div>
+    <p class="muted small">${cur ? `当前已指定到「${esc(cur.target)}」。` : "只影响这个网站，不影响同组的其他网站。"}</p>
+    ${familyChecks(fam, "pin", "set")}
+    ${cur ? familyChecks(fam, "pindel", "remove") : ""}`;
+  $("pinSet").onclick = async () => {
+    try {
+      const urls = [domain, ...checkedFam("pin-fam")];
+      await invoke("override_set", { cfg, urls, target: $("pinTarget").value });
+      await runCheck(lastUrl);
+    } catch (e) { showError(String(e)); }
+  };
+  if (cur) $("pinDel").onclick = async () => {
+    try {
+      const domains = [domain, ...checkedFam("pindel-fam")];
+      await invoke("override_remove", { cfg, domains });
+      await runCheck(lastUrl);
+    } catch (e) { showError(String(e)); }
+  };
+}
+
+// 「单站指定」标签页
+async function loadOverride() {
+  $("ovError").classList.add("hidden");
+  if (!(await ensureConnected())) {
+    $("ovStatus").innerHTML = `<p class="muted">还没有连上代理客户端的控制 API，请先在上方设置里连接。</p>`;
+    $("ovSetup").classList.add("hidden");
+    $("ovMain").classList.add("hidden");
+    return;
+  }
+  await refreshOverride();
+  if (!ov) return;
+  const cls = ov.installed ? "ok" : ov.supported ? "pending" : "";
+  $("ovStatus").innerHTML = `<div class="status-line ${cls}"><span class="dot"></span><span>${esc(ov.message)}</span></div>
+    <div class="muted small">规则文件位置：${esc(ov.dataDir)}</div>`;
+  $("ovSetup").classList.toggle("hidden", !ov.supported || ov.installed);
+  $("ovMain").classList.toggle("hidden", !ov.installed);
+  $("ovScript").textContent = ov.script;
+  $("ovPrepareMsg").textContent = ov.filesReady ? "✓ 已准备好" : "";
+  if (ov.installed) {
+    $("ovTarget").innerHTML = targetOptions();
+    $("ovList").innerHTML = ov.assignments.length
+      ? ov.assignments.map((a) => `
+        <tr><td>${esc(a.domain)}</td><td>${esc(a.target)}</td>
+          <td class="c-act"><button class="link remove" data-domain="${esc(a.domain)}" title="取消指定">×</button></td></tr>`).join("")
+      : `<tr><td colspan="3" class="muted">还没有指定任何网站。</td></tr>`;
+    $("ovList").querySelectorAll(".remove").forEach((b) => {
+      b.onclick = async () => {
+        try { await invoke("override_remove", { cfg, domains: [b.dataset.domain] }); loadOverride(); }
+        catch (e) { $("ovError").textContent = String(e); $("ovError").classList.remove("hidden"); }
+      };
+    });
+  }
+}
+
+$("ovPrepare").onclick = async () => {
+  try {
+    await invoke("override_prepare");
+    $("ovPrepareMsg").textContent = "✓ 已准备好";
+  } catch (e) { $("ovPrepareMsg").textContent = String(e); }
+};
+$("ovCopy").onclick = async () => {
+  const text = $("ovScript").textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    $("ovCopyMsg").textContent = "✓ 已复制";
+  } catch {
+    // 剪贴板不可用时，展开脚本并选中，让用户手动复制
+    const box = $("ovScript");
+    box.parentElement.open = true;
+    const range = document.createRange(); range.selectNodeContents(box);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    $("ovCopyMsg").textContent = "已选中，请按 Cmd+C 复制";
+  }
+};
+$("ovCheck").onclick = loadOverride;
+// 输入域名时，下方实时显示可一起指定的相关域名
+$("ovDomain").oninput = () => {
+  const d = domainOf($("ovDomain").value.trim());
+  $("ovFam").innerHTML = d ? familyChecks(findFamily(d), "ov", "set") : "";
+};
+$("ovForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const domain = domainOf($("ovDomain").value.trim());
+  if (!domain) return;
+  try {
+    const urls = [domain, ...checkedFam("ov-fam")];
+    await invoke("override_set", { cfg, urls, target: $("ovTarget").value });
+    $("ovDomain").value = "";
+    $("ovFam").innerHTML = "";
+    loadOverride();
+  } catch (err) { $("ovError").textContent = String(err); $("ovError").classList.remove("hidden"); }
 };
 
 // ───────── 启动：先试上次保存的配置，不行再自动读取 ─────────
